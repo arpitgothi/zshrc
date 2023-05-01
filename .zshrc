@@ -150,9 +150,18 @@ vpf() { vault kv get cloud-sec/std/lve/stacks/$1/admin }
 vvp() { vault kv get --version $2 cloud-sec/std/lve/stacks/$1/admin;}
 #pass() {FQDN=$(nslookup $1.$2.splunkcloud.com | egrep "(canonical name) = (sh|c0m|idm|shc)" | awk -F " " '{print $5}' | awk '{sub(/.$/,"")}1'); splunk-vault -f $FQDN $2}
 sv() {STACK=$(echo $1 | cut -f2 -d .); splunk-vault -f $1 $STACK}
-svv() { FQDN=$(ns $1.$2 | grep -m 1 canonical | awk -F "[=]" '{print $2}'| cut -c 2-); splunk-vault -f ${FQDN:0:-1} $2}
-
-
+svv() { 
+  if [[ "$1" == shc* ]]; then 
+    FQDN=$(sft resolve shc1.$2.splunkcloud.com | awk '/Name:/ {print $2}' | tr -d '\n')
+    #FQDN=$(sft resolve shc1.$2.splunkcloud.com | grep -m 1 Name: | awk -F "[\.:]" '{print $2}')
+  else
+    FQDN=$(ns $1.$2 | grep -m 1 canonical | awk -F "[=]" '{print $2}'| cut -c 2- | sed 's/.$//')
+    echo $2
+    #FQDN=$(ns $1.$2 | grep -m 1 canonical | awk -F "[=]" '{print $2}'| cut -c 2-);
+    #FQDN=${FQDN:0:-1}
+  fi
+  splunk-vault -f $FQDN $2
+  }
 ns()  { nslookup $1.splunkcloud.com; }
 
 sf()  { sft ssh $1; }
@@ -162,16 +171,27 @@ ss()  { sft ssh $1 --command 'sudo su - splunk'; }
 
 jn() { cloudctl stacks get $1 -o json | jq -r '{jobType: .status.lastProvisionedJobType, lastProvisionedPlanSummary: .status.lastProvisionedPlanSummary, status: .status.lastProvisionedStatus, lastProvisionedURL: .status.lastProvisionedURL}' }
 
+alias sh1='sh 1'
+alias sh2='sh 2'
+alias sh3='sh 3'
+alias sh4='sh 4'
+alias sh5='sh 5'
+alias idm1='idm 1'
+alias idm2='idm 2'
 c0m1() { sft ssh $(ns c0m1.$1 | grep -m 1 canonical | awk -F "[\.=]" '{print $5}'); }
-idm() { sft ssh $(ns idm1.$1 | grep -m 1 canonical | awk -F "[\.=]" '{print $5}'); }
-shc1() { sft ssh $(sft resolve shc1.$1.splunkcloud.com | grep -m 1 Name: | awk -F "[\.:]" '{print $2}') }
-sh1() { sft ssh $(ns sh1.$1 | grep -m 1 canonical | awk -F "[\.=]" '{print $5}'); }
-sh2() { sft ssh $(ns sh2.$1 | grep -m 1 canonical | awk -F "[\.=]" '{print $5}'); }
-sh3() { sft ssh $(ns sh3.$1 | grep -m 1 canonical | awk -F "[\.=]" '{print $5}'); }
-sh4() { sft ssh $(ns sh4.$1 | grep -m 1 canonical | awk -F "[\.=]" '{print $5}'); }
-sh5() { sft ssh $(ns sh5.$1 | grep -m 1 canonical | awk -F "[\.=]" '{print $5}'); }
+idm() {
+    local num=$1
+    local stack=$2
+    sft ssh $(ns idm${num}.${stack} | grep -m 1 canonical | awk -F "[\.=]" '{print $5}')
+}
+sh() {
+    local num=$1
+    local stack=$2
+    sft ssh $(ns sh${num}.${stack} | grep -m 1 canonical | awk -F "[\.=]" '{print $5}')
+}
 es() { sft ssh $(ns es-$1 | grep -m 2 canonical | tail -n1 | awk -F "[\.=]" '{print $5}'); }
 itsi() { sft ssh $(ns itsi-$1 | grep -m 2 canonical | tail -n1 | awk -F "[\.=]" '{print $5}'); }
+shc1() { sft ssh $(sft resolve shc1.$1.splunkcloud.com | grep -m 1 Name: | awk -F "[\.:]" '{print $2}') }
 
 dmc() { sft ssh $(ns c0m1.$1 | grep -m 1 canonical | awk -F "[\.=]" '{print $5}') --command 'sudo -u splunk sh -c "cd /opt/splunk/; cd var/log/splunk/; tail -f $(ls -ltrh | grep dmc_agent.log | tail -1f | awk '{print $9}')"'; }
 noah() { sft ssh $(ns c0m1.$1 | grep -m 1 canonical | awk -F "[\.=]" '{print $5}') --command 'sudo -i  sh -c "cd /; tail -f /var/log/syslog | grep noah"'; }
@@ -201,21 +221,22 @@ help() { echo "
 |##  19] sfd  --> SSH to splunk DEV instance                        ##|
 |##  20] ss   --> SSH to splunk LVE instance as splunk user         ##|
 |##  21] jn   --> Get jenkins build                                 ##|
-|##  22] sb   -->                                                   ##|
-|##  23] ac   -->                                                   ##|
-|##  24] aa   -->                                                   ##|
-|##  25] sv   -->                                                   ##|
-|##  26] svv  -->                                                   ##|
+|##  22] sb   --> splunkbase_info                                   ##|
+|##  23] ac   --> appStanza                                         ##|
+|##  24] aa   --> appStanza                                         ##|
+|##  25] sv   --> Get the cread by providing full FQDN              ##|
+|##  26] svv  --> Get the cread by instnace label and stack         ##|
 |##  27] c0m1 --> SSH to c0m1 instance of splunk LVE instance       ##|
-|##  28] idm  --> SSH to idm instance of splunk LVE instance        ##|
-|##  29] shc1 --> SSH to shc1 instance of splunk LVE instance       ##|
-|##  30] sh1  --> SSH to sh1 instance of splunk LVE instance        ##|
-|##  31] sh2  --> SSH to sh2 instance of splunk LVE instance        ##|
-|##  32] sh3  --> SSH to sh3 instance of splunk LVE instance        ##|
-|##  33] sh4  --> SSH to sh4 instance of splunk LVE instance        ##|
-|##  34] sh5  --> SSH to sh5 instance of splunk LVE instance        ##|
-|##  35] es   --> SSH to es instance of splunk LVE instance         ##|
-|##  36] itsi --> SSH to itsi instance of splunk LVE instance       ##|
+|##  28] idm  --> SSH to idm1 instance of splunk LVE instance       ##|
+|##  29] idm  --> SSH to idm2 instance of splunk LVE instance       ##|
+|##  30] shc1 --> SSH to shc1 instance of splunk LVE instance       ##|
+|##  31] sh1  --> SSH to sh1 instance of splunk LVE instance        ##|
+|##  32] sh2  --> SSH to sh2 instance of splunk LVE instance        ##|
+|##  33] sh3  --> SSH to sh3 instance of splunk LVE instance        ##|
+|##  34] sh4  --> SSH to sh4 instance of splunk LVE instance        ##|
+|##  35] sh5  --> SSH to sh5 instance of splunk LVE instance        ##|
+|##  36] es   --> SSH to es instance of splunk LVE instance         ##|
+|##  37] itsi --> SSH to itsi instance of splunk LVE instance       ##|
 |#####################################################################|"
 }
 
